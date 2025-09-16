@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+database:
+  host: db
+  port: 5432
+  user: marketplace
+  password: secret
+  name: marketplace
+  sslmode: disable
+
+jwt:
+  secret: "supersecretkey"
+  expires_in: 24h
