@@ -2,11 +2,12 @@ package main
 
 import (
 	"log"
-	"marketplace/internal/handlers"
-	"marketplace/internal/repository"
-	"marketplace/internal/services"
-	"marketplace/pkg/auth"
 	"net/http"
+
+	"github.com/btynybekov/marketplace/internal/repository"
+	"github.com/btynybekov/marketplace/internal/services"
+
+	"github.com/btynybekov/marketplace/internal/handlers"
 
 	"github.com/gorilla/mux"
 )
@@ -43,19 +44,13 @@ func main() {
 	// User endpoints
 	r.HandleFunc("/register", userHandler.Register).Methods("POST")
 	r.HandleFunc("/login", userHandler.Login).Methods("POST")
-	r.Handle("/users/me", auth.JWTMiddleware(userHandler.Profile)).Methods("GET")
 
 	// Item endpoints
-	r.Handle("/items", auth.JWTMiddleware(itemHandler.Create)).Methods("POST")
 	r.HandleFunc("/items", itemHandler.List).Methods("GET")
 	r.HandleFunc("/items/{id}", itemHandler.Get).Methods("GET")
-	r.Handle("/items/{id}", auth.JWTMiddleware(itemHandler.Update)).Methods("PUT")
-	r.Handle("/items/{id}", auth.JWTMiddleware(itemHandler.Delete)).Methods("DELETE")
 
 	// Category endpoints
 	r.HandleFunc("/categories", categoryHandler.List).Methods("GET")
-	r.Handle("/categories", auth.JWTMiddleware(categoryHandler.Create)).Methods("POST")
-
 	log.Println("Server started on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }

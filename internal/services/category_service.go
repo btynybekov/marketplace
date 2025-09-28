@@ -1,8 +1,8 @@
 package services
 
 import (
-	"marketplace/internal/models"
-	"marketplace/internal/repository"
+	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/repository"
 )
 
 type CategoryService struct {

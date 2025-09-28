@@ -2,8 +2,9 @@ package repository
 
 import (
 	"database/sql"
-	"marketplace/internal/models"
 	"time"
+
+	"github.com/btynybekov/marketplace/internal/models"
 )
 
 type ItemRepository struct {

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"marketplace/internal/models"
-	"marketplace/internal/services"
+	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/services"
 
 	"github.com/gorilla/mux"
 )

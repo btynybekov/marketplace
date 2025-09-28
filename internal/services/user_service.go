@@ -2,8 +2,9 @@ package services
 
 import (
 	"errors"
-	"marketplace/internal/models"
-	"marketplace/internal/repository"
+
+	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/repository"
 
 	"golang.org/x/crypto/bcrypt"
 )

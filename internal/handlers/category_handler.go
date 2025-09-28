@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"marketplace/internal/models"
-	"marketplace/internal/services"
 	"net/http"
+
+	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/services"
 )
 
 type CategoryHandler struct {

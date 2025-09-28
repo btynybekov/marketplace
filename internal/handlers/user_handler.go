@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
-	"marketplace/internal/models"
-	"marketplace/internal/services"
-	"marketplace/pkg/auth"
 	"net/http"
+
+	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/services"
+	"github.com/btynybekov/marketplace/pkg/auth"
 )
 
 type UserHandler struct {

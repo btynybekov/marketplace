@@ -2,7 +2,8 @@ package repository
 
 import (
 	"database/sql"
-	"marketplace/internal/models"
+
+	"github.com/btynybekov/marketplace/internal/models"
 )
 
 type UserRepository struct {
