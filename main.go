@@ -10,9 +10,16 @@ import (
 	"github.com/btynybekov/marketplace/internal/handlers"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Println("No .env file found, relying on environment variables")
+	}
+
 	cfg, err := repository.LoadConfig("configs/config.yaml")
 	if err != nil {
 		log.Fatal(err)

@@ -3,8 +3,10 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
+
+	_ "github.com/lib/pq"
 
 	"gopkg.in/yaml.v2"
 )
@@ -22,7 +24,7 @@ type Config struct {
 
 func LoadConfig(path string) (*Config, error) {
 	cfg := &Config{}
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -32,8 +34,12 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-func ConnectDB(cfg *Config) (*sql.DB, error) {
-	dsn := fmt.Sprintf(
+func getDSN(cfg *Config) string {
+	if url := os.Getenv("DATABASE_URL"); url != "" {
+		return url
+	}
+
+	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Database.Host,
 		cfg.Database.Port,
@@ -42,6 +48,10 @@ func ConnectDB(cfg *Config) (*sql.DB, error) {
 		cfg.Database.Name,
 		cfg.Database.SSLMode,
 	)
+}
+
+func ConnectDB(cfg *Config) (*sql.DB, error) {
+	dsn := getDSN(cfg)
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

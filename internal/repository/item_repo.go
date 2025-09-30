@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"time"
 
+	_ "github.com/lib/pq"
+
 	"github.com/btynybekov/marketplace/internal/models"
 )
 
