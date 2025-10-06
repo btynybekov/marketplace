@@ -1,0 +1,25 @@
+{{define "header"}}
+<header style="display:flex; justify-content:space-between; align-items:center; padding:15px 20px; background:#f8f8f8; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+    <!-- Логотип -->
+    <div>
+        <a href="/" style="font-size:24px; font-weight:bold; color:#333; text-decoration:none;">Marketplace</a>
+    </div>
+
+    <!-- Поисковик -->
+    <div style="flex:1; max-width:400px; margin:0 20px;">
+        <form action="/search" method="GET" style="display:flex;">
+            <input type="text" name="q" placeholder="Поиск товаров..." 
+                style="flex:1; padding:8px 12px; border:1px solid #ccc; border-radius:4px 0 0 4px; outline:none;">
+            <button type="submit" style="padding:8px 12px; border:none; background:#0077cc; color:white; border-radius:0 4px 4px 0; cursor:pointer;">
+                🔍
+            </button>
+        </form>
+    </div>
+
+    <!-- Кнопки -->
+    <div style="display:flex; gap:10px;">
+        <a href="/login" style="padding:8px 15px; background:#0077cc; color:white; border-radius:4px; text-decoration:none;">Войти</a>
+        <a href="/add-item" style="padding:8px 15px; background:#28a745; color:white; border-radius:4px; text-decoration:none;">Добавить объявление</a>
+    </div>
+</header>
+{{end}}

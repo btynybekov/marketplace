@@ -1,0 +1,47 @@
+{{define "title"}}Главная{{end}}
+
+{{define "content"}}
+
+<h2 style="margin-bottom:20px;">Категории</h2>
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:20px;">
+    {{range .Categories}}
+        <div style="background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; text-align:center; transition: transform 0.2s;">
+            <a href="/{{.Slug}}" style="color:inherit; text-decoration:none;">
+                <div style="height:120px; overflow:hidden;">
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover; transition: transform 0.3s;">
+                </div>
+                <h3 style="margin:10px 0;">{{.Name}}</h3>
+            </a>
+        </div>
+    {{else}}
+        <p>Категории отсутствуют</p>
+    {{end}}
+</div>
+
+<h2 style="margin:40px 0 20px;">Недавние товары</h2>
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:20px;">
+    {{range .RecentItems}}
+        <div style="background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; text-align:center; transition: transform 0.2s;">
+            <a href="/item/{{.ID}}" style="color:inherit; text-decoration:none;">
+                <div style="height:150px; overflow:hidden;">
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover; transition: transform 0.3s;">
+                </div>
+                <h3 style="margin:10px 0;">{{.Name}}</h3>
+                <p style="margin:5px 0;">Цена: {{.Price}} сом</p>
+            </a>
+        </div>
+    {{else}}
+        <p>Товары отсутствуют</p>
+    {{end}}
+</div>
+
+<style>
+div a:hover img {
+    transform: scale(1.05);
+}
+div a:hover {
+    text-decoration: none;
+}
+</style>
+
+{{end}}
