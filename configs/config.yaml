@@ -4,11 +4,7 @@ server:
 database:
   host: localhost
   port: 5432
-  user: dev
-  password: secret
+  user: postgres
+  password: password
   name: mydb
   sslmode: disable
-
-jwt:
-  secret: "supersecretkey"
-  expires_in: 24h
