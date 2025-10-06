@@ -4,60 +4,28 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/btynybekov/marketplace/internal/repository"
-	"github.com/btynybekov/marketplace/internal/services"
-
+	"github.com/btynybekov/marketplace/config"
+	db "github.com/btynybekov/marketplace/database"
 	"github.com/btynybekov/marketplace/internal/handlers"
-
+	"github.com/btynybekov/marketplace/internal/repository"
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
 )
 
 func main() {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("No .env file found, relying on environment variables")
-	}
+	config.LoadConfig("configs/config.yaml")
+	db.InitDB()
+	defer db.CloseDB()
 
-	cfg, err := repository.LoadConfig("configs/config.yaml")
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Создаём репозиторий
+	repo := repository.NewPostgresRepo(db.Pool)
 
-	db, err := repository.ConnectDB(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+	// Создаём handler через Repo
+	h := handlers.NewHandler(repo)
 
-	// Репозитории
-	userRepo := repository.NewUserRepository(db)
-	itemRepo := repository.NewItemRepository(db)
-	categoryRepo := repository.NewCategoryRepository(db)
+	router := mux.NewRouter()
+	router.HandleFunc("/", h.HomePage)
+	router.HandleFunc("/category/{slug}", h.CategoryPage)
 
-	// Сервисы
-	userService := services.NewUserService(userRepo)
-	itemService := services.NewItemService(itemRepo, categoryRepo)
-	categoryService := services.NewCategoryService(categoryRepo)
-
-	// Handlers
-	userHandler := handlers.NewUserHandler(userService)
-	itemHandler := handlers.NewItemHandler(itemService)
-	categoryHandler := handlers.NewCategoryHandler(categoryService)
-
-	r := mux.NewRouter()
-
-	// User endpoints
-	r.HandleFunc("/register", userHandler.Register).Methods("POST")
-	r.HandleFunc("/login", userHandler.Login).Methods("POST")
-
-	// Item endpoints
-	r.HandleFunc("/items", itemHandler.List).Methods("GET")
-	r.HandleFunc("/items/{id}", itemHandler.Get).Methods("GET")
-
-	// Category endpoints
-	r.HandleFunc("/categories", categoryHandler.List).Methods("GET")
-	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	log.Println("Server started at :8080")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
