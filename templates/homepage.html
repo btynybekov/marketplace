@@ -1,16 +1,30 @@
-{{define "title"}}Главная{{end}}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Главная</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .category-card, .item-card { background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; text-align:center; transition: transform 0.2s; }
+        .category-grid, .items-grid { display:grid; gap:20px; }
+        .category-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+        .items-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+        .hover-scale img { transition: transform 0.3s; }
+        .hover-scale:hover img { transform: scale(1.05); }
+        a { text-decoration:none; color:inherit; }
+    </style>
+</head>
+<body>
 
-{{define "content"}}
-
-<h2 style="margin-bottom:20px;">Категории</h2>
-<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:20px;">
+<h2>Категории</h2>
+<div class="category-grid">
     {{range .Categories}}
-        <div style="background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; text-align:center; transition: transform 0.2s;">
-            <a href="/{{.Slug}}" style="color:inherit; text-decoration:none;">
+        <div class="category-card hover-scale">
+            <a href="/{{.Slug}}">
                 <div style="height:120px; overflow:hidden;">
-                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover; transition: transform 0.3s;">
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover;">
                 </div>
-                <h3 style="margin:10px 0;">{{.Name}}</h3>
+                <h3>{{.Name}}</h3>
             </a>
         </div>
     {{else}}
@@ -18,16 +32,16 @@
     {{end}}
 </div>
 
-<h2 style="margin:40px 0 20px;">Недавние товары</h2>
-<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:20px;">
+<h2>Недавние товары</h2>
+<div class="items-grid">
     {{range .RecentItems}}
-        <div style="background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); overflow:hidden; text-align:center; transition: transform 0.2s;">
-            <a href="/item/{{.ID}}" style="color:inherit; text-decoration:none;">
+        <div class="item-card hover-scale">
+            <a href="/item/{{.ID}}">
                 <div style="height:150px; overflow:hidden;">
-                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover; transition: transform 0.3s;">
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover;">
                 </div>
-                <h3 style="margin:10px 0;">{{.Name}}</h3>
-                <p style="margin:5px 0;">Цена: {{.Price}} сом</p>
+                <h3>{{.Name}}</h3>
+                <p>Цена: {{.Price}} сом</p>
             </a>
         </div>
     {{else}}
@@ -35,13 +49,5 @@
     {{end}}
 </div>
 
-<style>
-div a:hover img {
-    transform: scale(1.05);
-}
-div a:hover {
-    text-decoration: none;
-}
-</style>
-
-{{end}}
+</body>
+</html>

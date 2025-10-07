@@ -115,3 +115,58 @@ func (r *PostgresRepo) GetItemsByCategoryID(ctx context.Context, categoryID int3
 
 	return items, nil
 }
+
+func (r *PostgresRepo) SaveMessage(ctx context.Context, userID, role, content string) error {
+	_, err := r.DB.Exec(ctx, `
+		INSERT INTO chat_messages (user_id, role, content, created_at)
+		VALUES ($1, $2, $3, NOW())
+	`, userID, role, content)
+	return err
+}
+
+func (r *PostgresRepo) GetHistory(ctx context.Context, userID string, limit int) ([]models.ChatMessage, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT id, user_id, role, content, created_at
+		FROM chat_messages
+		WHERE user_id = $1
+		ORDER BY created_at ASC
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []models.ChatMessage
+	for rows.Next() {
+		var m models.ChatMessage
+		if err := rows.Scan(&m.ID, &m.UserID, &m.Role, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, nil
+}
+
+func (r *PostgresRepo) GetItemByID(ctx context.Context, itemID int32) (models.Item, error) {
+	var item models.Item
+	query := `
+		SELECT id, name, description, price, category_id, created_at, sub_category_id, stock, weight, color, image_url
+		FROM products
+		WHERE id = $1
+	`
+	err := r.DB.QueryRow(ctx, query, itemID).Scan(
+		&item.ID,
+		&item.Name,
+		&item.Description,
+		&item.Price,
+		&item.CategoryId,
+		&item.CreatedAt,
+		&item.SubCategoryId,
+		&item.Stock,
+		&item.Weight,
+		&item.Color,
+		&item.ImageURL,
+	)
+	return item, err
+}

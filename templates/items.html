@@ -1,23 +1,39 @@
-{{define "title"}}Товары{{end}}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Товары</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding:20px; }
+        .categories { display:flex; gap:10px; margin-bottom:20px; }
+        .category-card { background:#f0f0f0; padding:10px; border-radius:6px; text-align:center; }
+        .items-grid { display:flex; flex-wrap:wrap; gap:20px; }
+        .item-card { background:white; padding:15px; border-radius:8px; width:220px; box-shadow:0 2px 8px rgba(0,0,0,0.1); text-align:center; }
+        img { width:100%; height:150px; object-fit:cover; border-radius:4px; }
+        a { text-decoration:none; color:inherit; display:inline-block; margin-top:10px; padding:5px 10px; background:#0077cc; color:white; border-radius:4px; }
+    </style>
+</head>
+<body>
 
-{{define "categories"}}
+<div class="categories">
     {{range .Categories}}
         <div class="category-card">
             <a href="/category/{{.Slug}}">{{.Name}}</a>
         </div>
     {{end}}
-{{end}}
+</div>
 
-{{define "content"}}
 <h2>Список товаров</h2>
-<div style="display:flex; flex-wrap:wrap; gap:20px;">
+<div class="items-grid">
     {{range .RecentItems}}
-        <div style="background:white; padding:15px; border-radius:8px; width:220px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-            <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:150px; object-fit:cover; border-radius:4px;">
+        <div class="item-card">
+            <img src="{{.ImageURL}}" alt="{{.Name}}">
             <h3>{{.Name}}</h3>
             <p>Цена: {{.Price}} сом</p>
-            <a href="/item/{{.ID}}" style="display:inline-block; margin-top:10px; padding:5px 10px; background:#0077cc; color:white; border-radius:4px;">Подробнее</a>
+            <a href="/item/{{.ID}}">Подробнее</a>
         </div>
     {{end}}
 </div>
-{{end}}
+
+</body>
+</html>

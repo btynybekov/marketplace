@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Чат с ассистентом</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding:20px; }
+        #chat-container { max-width:600px; margin:0 auto; }
+        #messages { border:1px solid #ccc; padding:10px; height:300px; overflow-y:auto; margin-bottom:10px; }
+        input { width:80%; padding:8px; }
+        button { padding:8px 12px; }
+    </style>
+</head>
+<body>
+
+<h1>Чат с ассистентом</h1>
+<div id="chat-container">
+    <div id="messages"></div>
+    <input type="text" id="user-input" placeholder="Введите сообщение">
+    <button onclick="sendMessage()">Отправить</button>
+</div>
+
+<script>
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const message = input.value;
+    if (!message) return;
+
+    const response = await fetch('/chat/ajax', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: 'anonymous', message })
+    });
+    const data = await response.json();
+
+    const messagesDiv = document.getElementById('messages');
+    messagesDiv.innerHTML += `<p><b>Вы:</b> ${message}</p>`;
+    messagesDiv.innerHTML += `<p><b>AI:</b> ${data.message}</p>`;
+
+    input.value = '';
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+</script>
+
+</body>
+</html>

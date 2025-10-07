@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{{.Category.Name}}</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding:20px; }
+        .items-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:20px; }
+        .item-card { background:white; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); text-align:center; overflow:hidden; }
+        a { text-decoration:none; color:inherit; }
+    </style>
+</head>
+<body>
+
+<h2>{{.Category.Name}}</h2>
+
+<div class="items-grid">
+    {{range .Items}}
+        <div class="item-card">
+            <a href="/item/{{.ID}}">
+                <div style="height:150px; overflow:hidden;">
+                    <img src="{{.ImageURL}}" alt="{{.Name}}" style="width:100%; height:100%; object-fit:cover;">
+                </div>
+                <h3>{{.Name}}</h3>
+                <p>Цена: {{.Price}}</p>
+            </a>
+        </div>
+    {{else}}
+        <p>Товары отсутствуют</p>
+    {{end}}
+</div>
+
+</body>
+</html>

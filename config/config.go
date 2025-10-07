@@ -1,63 +1,56 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 
 	"github.com/joho/godotenv"
-	"gopkg.in/yaml.v2"
 )
 
-type Config struct {
-	Server struct {
-		Port int `yaml:"port"`
-	} `yaml:"server"`
-	Database struct {
-		Host     string `yaml:"host"`
-		Port     int    `yaml:"port"`
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-		Name     string `yaml:"name"`
-		SSLMode  string `yaml:"sslmode"`
-	} `yaml:"database"`
+// EnvConfig хранит все глобальные переменные окружения
+type EnvConfig struct {
+	PORT                string // Порт сервера
+	DatabaseURL         string // Полная строка подключения к БД
+	N8NBuyerWebhookURL  string // Вебхук ассистента покупателя
+	N8NSellerWebhookURL string // Вебхук ассистента продавца
+	AssetsBaseURL       string // Базовый URL для статических файлов
 }
 
-var Cfg Config
+// Env — глобальная структура для всего приложения
+var Env EnvConfig
 
-func LoadConfig(path string) {
-	f, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalf("Failed to read config.yaml: %v", err)
+// LoadFromEnv загружает переменные окружения и .env в EnvConfig
+func LoadFromEnv() EnvConfig {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal(".env file not found, reading from system environment")
 	}
+	log.Println(getenvOrDefault("DATABASE_URL", ""))
 
-	if err := yaml.Unmarshal(f, &Cfg); err != nil {
-		log.Fatalf("Failed to parse config.yaml: %v", err)
+	cfg := EnvConfig{
+		// Серверный порт
+		PORT: getenvOrDefault("PORT", "8080"),
+		// DATABASE_URL
+		DatabaseURL:         getenvOrDefault("DATABASE_URL", ""),
+		N8NBuyerWebhookURL:  getenvOrDefault("N8N_BUYER_ASSISTANT_WEBHOOK_URL", ""),
+		N8NSellerWebhookURL: getenvOrDefault("N8N_SELLER_ASSISTANT_WEBHOOK_URL", ""),
+		AssetsBaseURL:       getenvOrDefault("ASSETS_BASE_URL", "/static"),
 	}
-
-	_ = godotenv.Load()
-
-	if url := os.Getenv("DATABASE_URL"); url != "" {
-		Cfg.Database.Port = 0
-		Cfg.Database.User = ""
-		Cfg.Database.Password = ""
-		Cfg.Database.Name = ""
-		Cfg.Database.SSLMode = ""
-	}
+	return cfg
 }
 
-func GetDSN() string {
-	if url := os.Getenv("DATABASE_URL"); url != "" {
-		return url
+// GetDSN возвращает строку подключения к БД
+func GetDSN(cfg EnvConfig) string {
+	if cfg.DatabaseURL != "" {
+		return Env.DatabaseURL
 	}
+	log.Fatal("DATABASE_URL is not set, cannot connect to DB")
+	return ""
+}
 
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		Cfg.Database.User,
-		Cfg.Database.Password,
-		Cfg.Database.Host,
-		Cfg.Database.Port,
-		Cfg.Database.Name,
-		Cfg.Database.SSLMode,
-	)
+// Вспомогательная функция для получения значения с дефолтом
+func getenvOrDefault(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultValue
 }
