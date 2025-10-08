@@ -25,14 +25,12 @@ func (h *ChatPageHandler) WithTemplate(t *template.Template) *ChatPageHandler {
 	return h
 }
 
-// ServeHTTP — рендер страницы чата (или JSON-заглушки).
 func (h *ChatPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// если нет шаблона — отдадим JSON
 	if h.tmpl == nil || h.tmpl.Lookup("chat.html") == nil {
 		shared.WriteJSON(w, http.StatusOK, map[string]any{
 			"message": "chat page",

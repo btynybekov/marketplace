@@ -2,211 +2,59 @@ package repository
 
 import (
 	"context"
-	"fmt"
-	"sort"
-	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/btynybekov/marketplace/internal/models"
-	"github.com/btynybekov/marketplace/storage"
 )
 
-//
-// ──────────────────────────────────────────────
-//   ИНТЕРФЕЙСЫ
-// ──────────────────────────────────────────────
-//
+// ===== RepositorySet (склейка) =====
 
-// CategoryRepository управляет категориями.
-type CategoryRepository interface {
-	ListRoots(ctx context.Context) ([]models.Category, error)
-	ListChildrenBySlug(ctx context.Context, parentSlug string) ([]models.Category, error)
-	GetBySlug(ctx context.Context, slug string) (*models.Category, error)
+type pgRepo struct {
+	db *pgxpool.Pool
+
+	productsRepo     ProductsRepository
+	productMediaRepo ProductMediaRepository
+	categoriesRepo   CategoriesRepository
+
+	conversationsRepo  ConversationsRepository
+	messagesRepo       MessagesRepository
+	searchRequestsRepo SearchRequestsRepository
 }
 
-// ProductRepository управляет товарами.
-type ProductRepository interface {
-	Get(ctx context.Context, id string) (*models.Product, error)
-	ListByCategorySlug(ctx context.Context, slug string, limit, offset int) ([]models.Product, error)
+func New(db *pgxpool.Pool) RepositorySet {
+	r := &pgRepo{db: db}
+	r.productsRepo = &productsRepo{db: db}
+	r.productMediaRepo = &productMediaRepo{db: db}
+	r.categoriesRepo = &categoriesRepo{db: db}
+	r.conversationsRepo = &conversationsRepo{db: db}
+	r.messagesRepo = &messagesRepo{db: db}
+	r.searchRequestsRepo = &searchRequestsRepo{db: db}
+	return r
 }
 
-// ListingRepository управляет объявлениями.
-type ListingRepository interface {
-	Get(ctx context.Context, id string) (*models.Listing, error)
-	Search(ctx context.Context, p ListingSearchParams) ([]ListingWithProduct, error)
-}
+func (r *pgRepo) Products() ProductsRepository             { return r.productsRepo }
+func (r *pgRepo) ProductMedia() ProductMediaRepository     { return r.productMediaRepo }
+func (r *pgRepo) Categories() CategoriesRepository         { return r.categoriesRepo }
+func (r *pgRepo) Conversations() ConversationsRepository   { return r.conversationsRepo }
+func (r *pgRepo) Messages() MessagesRepository             { return r.messagesRepo }
+func (r *pgRepo) SearchRequests() SearchRequestsRepository { return r.searchRequestsRepo }
 
-// RepositorySet агрегирует все репозитории.
-type RepositorySet interface {
-	Categories() CategoryRepository
-	Products() ProductRepository
-	Listings() ListingRepository
-}
+// ===== ProductsRepository impl =====
 
-// ListingSearchParams — фильтры для поиска объявлений.
-type ListingSearchParams struct {
-	CategorySlug string
-	PriceMax     *float64
-	Currency     string
-	Attrs        map[string]string
-	SortBy       string
-	SortOrder    string
-	Limit        int
-	Offset       int
-}
+type productsRepo struct{ db *pgxpool.Pool }
 
-// ListingWithProduct — результат поиска (объявление + продукт + медиа).
-type ListingWithProduct struct {
-	Listing models.Listing        `json:"listing"`
-	Product models.Product        `json:"product"`
-	Media   []models.ListingMedia `json:"media,omitempty"`
-}
-
-//
-// ──────────────────────────────────────────────
-//   РЕАЛИЗАЦИЯ НА POSTGRES
-// ──────────────────────────────────────────────
-//
-
-// postgresSet агрегирует конкретные реализации.
-type postgresSet struct {
-	cats  *categoryRepo
-	prods *productRepo
-	lists *listingRepo
-}
-
-// NewSet возвращает готовый набор репозиториев.
-func NewSet(db *storage.DB) RepositorySet {
-	return &postgresSet{
-		cats:  &categoryRepo{db: db},
-		prods: &productRepo{db: db},
-		lists: &listingRepo{db: db},
-	}
-}
-
-func (s *postgresSet) Categories() CategoryRepository { return s.cats }
-func (s *postgresSet) Products() ProductRepository    { return s.prods }
-func (s *postgresSet) Listings() ListingRepository    { return s.lists }
-
-//
-// ──────────────────────────────────────────────
-//   CATEGORY REPO
-// ──────────────────────────────────────────────
-//
-
-type categoryRepo struct{ db *storage.DB }
-
-func (r *categoryRepo) ListRoots(ctx context.Context) ([]models.Category, error) {
-	const q = `
-SELECT id, parent_id, name, slug, path, is_active, sort_order, created_at, updated_at
-FROM category
-WHERE parent_id IS NULL AND is_active = TRUE
-ORDER BY sort_order, name;`
-	rows, err := r.db.Pool.Query(ctx, q)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []models.Category
-	for rows.Next() {
-		var c models.Category
-		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.Slug, &c.Path, &c.IsActive, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-func (r *categoryRepo) ListChildrenBySlug(ctx context.Context, slug string) ([]models.Category, error) {
-	const q = `
-SELECT c2.id, c2.parent_id, c2.name, c2.slug, c2.path, c2.is_active, c2.sort_order, c2.created_at, c2.updated_at
-FROM category c1
-JOIN category c2 ON c2.parent_id = c1.id
-WHERE c1.slug = $1 AND c2.is_active = TRUE
-ORDER BY c2.sort_order, c2.name;`
-	rows, err := r.db.Pool.Query(ctx, q, slug)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []models.Category
-	for rows.Next() {
-		var c models.Category
-		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.Slug, &c.Path, &c.IsActive, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
-}
-
-func (r *categoryRepo) GetBySlug(ctx context.Context, slug string) (*models.Category, error) {
-	const q = `
-SELECT id, parent_id, name, slug, path, is_active, sort_order, created_at, updated_at
-FROM category WHERE slug=$1;`
-	var c models.Category
-	if err := r.db.Pool.QueryRow(ctx, q, slug).
-		Scan(&c.ID, &c.ParentID, &c.Name, &c.Slug, &c.Path, &c.IsActive, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
-//
-// ──────────────────────────────────────────────
-//   PRODUCT REPO
-// ──────────────────────────────────────────────
-//
-
-type productRepo struct{ db *storage.DB }
-
-func (r *productRepo) Get(ctx context.Context, id string) (*models.Product, error) {
-	const q = `
-SELECT id, category_id, brand_id, model, title, specs, is_active, created_at, updated_at
-FROM product WHERE id=$1;`
-	var p models.Product
-	if err := r.db.Pool.QueryRow(ctx, q, id).
-		Scan(&p.ID, &p.CategoryID, &p.BrandID, &p.Model, &p.Title, &p.Specs, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
-		return nil, err
-	}
-
-	const qm = `
-SELECT id, product_id, url, type, is_cover, alt, sort_order
-FROM product_media
-WHERE product_id=$1
-ORDER BY is_cover DESC, sort_order ASC;`
-	rows, err := r.db.Pool.Query(ctx, qm, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var m models.ProductMedia
-		if err := rows.Scan(&m.ID, &m.ProductID, &m.URL, &m.Type, &m.IsCover, &m.Alt, &m.SortOrder); err != nil {
-			return nil, err
-		}
-		p.Media = append(p.Media, m)
-	}
-	return &p, rows.Err()
-}
-
-func (r *productRepo) ListByCategorySlug(ctx context.Context, slug string, limit, offset int) ([]models.Product, error) {
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	const q = `
-SELECT p.id, p.category_id, p.brand_id, p.model, p.title, p.specs, p.is_active, p.created_at, p.updated_at
-FROM product p
-JOIN category c ON c.id=p.category_id
-WHERE c.slug=$1
-ORDER BY p.created_at DESC
-LIMIT $2 OFFSET $3;`
-	rows, err := r.db.Pool.Query(ctx, q, slug, limit, offset)
+func (r *productsRepo) ListByCategorySlug(ctx context.Context, slug string, limit, offset int) ([]models.Product, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT p.id, p.title, p.price_amount, p.currency_code, p.attrs, p.filter_url
+		FROM product p
+		JOIN category c ON c.id = p.category_id
+		WHERE c.slug = $1
+		ORDER BY p.created_at DESC
+		LIMIT $2 OFFSET $3
+	`, slug, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +63,7 @@ LIMIT $2 OFFSET $3;`
 	out := make([]models.Product, 0, limit)
 	for rows.Next() {
 		var p models.Product
-		if err := rows.Scan(&p.ID, &p.CategoryID, &p.BrandID, &p.Model, &p.Title, &p.Specs, &p.IsActive, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &p.PriceAmount, &p.CurrencyCode, &p.Attrs, &p.FilterURL); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -223,149 +71,204 @@ LIMIT $2 OFFSET $3;`
 	return out, rows.Err()
 }
 
-//
-// ──────────────────────────────────────────────
-//   LISTING REPO
-// ──────────────────────────────────────────────
-//
+// ===== ProductMediaRepository impl =====
 
-type listingRepo struct{ db *storage.DB }
+type productMediaRepo struct{ db *pgxpool.Pool }
 
-func (r *listingRepo) Get(ctx context.Context, id string) (*models.Listing, error) {
-	const q = `
-SELECT id, seller_id, product_id, category_id, title, description,
-       price_amount, currency_code, condition, location_text,
-       attrs, status, created_at, updated_at
-FROM listing WHERE id=$1;`
-	var l models.Listing
-	if err := r.db.Pool.QueryRow(ctx, q, id).
-		Scan(&l.ID, &l.SellerID, &l.ProductID, &l.CategoryID, &l.Title, &l.Description,
-			&l.PriceAmount, &l.CurrencyCode, &l.Condition, &l.LocationText,
-			&l.Attrs, &l.Status, &l.CreatedAt, &l.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return &l, nil
-}
-
-func (r *listingRepo) Search(ctx context.Context, p ListingSearchParams) ([]ListingWithProduct, error) {
-	limit := p.Limit
-	if limit <= 0 || limit > 50 {
-		limit = 20
-	}
-	offset := 0
-	if p.Offset > 0 {
-		offset = p.Offset
+func (r *productMediaRepo) ListByProductIDs(ctx context.Context, ids []uuid.UUID) ([]models.ProductMedia, error) {
+	if len(ids) == 0 {
+		return nil, nil
 	}
 
-	sortBy := "l.price_amount"
-	if p.SortBy == "created_at" {
-		sortBy = "l.created_at"
-	}
-	sortOrder := "ASC"
-	if strings.EqualFold(p.SortOrder, "desc") {
-		sortOrder = "DESC"
-	}
-
-	where := []string{"c.slug = $1", "l.status = 'active'", "l.currency_code = $2"}
-	args := []any{p.CategorySlug, p.Currency}
-	argPos := 3
-
-	if p.PriceMax != nil {
-		where = append(where, fmt.Sprintf("l.price_amount <= $%d", argPos))
-		args = append(args, *p.PriceMax)
-		argPos++
-	}
-
-	keys := make([]string, 0, len(p.Attrs))
-	for k := range p.Attrs {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := p.Attrs[k]
-		where = append(where, fmt.Sprintf("l.attrs->>$%d = $%d", argPos, argPos+1))
-		args = append(args, k, v)
-		argPos += 2
-	}
-
-	q := fmt.Sprintf(`
-SELECT
-  l.id, l.seller_id, l.product_id, l.category_id, l.title, l.description,
-  l.price_amount, l.currency_code, l.condition, l.location_text, l.attrs, l.status, l.created_at, l.updated_at,
-  p.id, p.category_id, p.brand_id, p.model, p.title, p.specs, p.is_active, p.created_at, p.updated_at
-FROM listing l
-JOIN category c ON c.id=l.category_id
-JOIN product p  ON p.id=l.product_id
-WHERE %s
-ORDER BY %s %s, l.created_at DESC
-LIMIT %d OFFSET %d;`,
-		strings.Join(where, " AND "), sortBy, sortOrder, limit, offset,
-	)
-
-	rows, err := r.db.Pool.Query(ctx, q, args...)
+	rows, err := r.db.Query(ctx, `
+		SELECT product_id, url, sort, cover
+		FROM product_media
+		WHERE product_id = ANY($1)
+	`, ids)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var results []ListingWithProduct
-	var ids []string
-
+	var out []models.ProductMedia
 	for rows.Next() {
-		var li models.Listing
-		var pr models.Product
-		if err := rows.Scan(
-			&li.ID, &li.SellerID, &li.ProductID, &li.CategoryID, &li.Title, &li.Description,
-			&li.PriceAmount, &li.CurrencyCode, &li.Condition, &li.LocationText, &li.Attrs, &li.Status, &li.CreatedAt, &li.UpdatedAt,
-			&pr.ID, &pr.CategoryID, &pr.BrandID, &pr.Model, &pr.Title, &pr.Specs, &pr.IsActive, &pr.CreatedAt, &pr.UpdatedAt,
-		); err != nil {
+		var m models.ProductMedia
+		if err := rows.Scan(&m.ProductID, &m.URL, &m.Sort, &m.Cover); err != nil {
 			return nil, err
 		}
-		results = append(results, ListingWithProduct{Listing: li, Product: pr})
-		ids = append(ids, li.ID)
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// ===== CategoriesRepository impl =====
+
+type categoriesRepo struct{ db *pgxpool.Pool }
+
+func (r *categoriesRepo) ListRoots(ctx context.Context) ([]models.Category, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT name, slug
+		FROM category
+		WHERE parent_id IS NULL
+		ORDER BY name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.Category
+	for rows.Next() {
+		var c models.Category
+		if err := rows.Scan(&c.Name, &c.Slug); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *categoriesRepo) Tree(ctx context.Context) ([]models.Category, error) {
+	type row struct {
+		ID       int64
+		Name     string
+		Slug     string
+		ParentID *int64
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT id, name, slug, parent_id
+		FROM category
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	all := make([]row, 0, 256)
+	for rows.Next() {
+		var rr row
+		if err := rows.Scan(&rr.ID, &rr.Name, &rr.Slug, &rr.ParentID); err != nil {
+			return nil, err
+		}
+		all = append(all, rr)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	if len(ids) == 0 {
-		return results, nil
+	index := map[int64]*models.Category{}
+	for _, r := range all {
+		index[r.ID] = &models.Category{Name: r.Name, Slug: r.Slug}
+	}
+	var roots []models.Category
+	for _, r := range all {
+		if r.ParentID == nil {
+			roots = append(roots, *index[r.ID])
+		} else {
+			parent := index[*r.ParentID]
+			parent.Children = append(parent.Children, *index[r.ID])
+		}
+	}
+	return roots, nil
+}
+
+// ===== ConversationsRepository impl =====
+
+type conversationsRepo struct{ db *pgxpool.Pool }
+
+func (r *conversationsRepo) GetOrCreateBySession(ctx context.Context, sessionID string, userID *uuid.UUID) (models.Conversation, error) {
+	// пробуем найти
+	var c models.Conversation
+	err := r.db.QueryRow(ctx, `
+		SELECT id, session_id, user_id, created_at
+		FROM conversation
+		WHERE session_id = $1
+		LIMIT 1
+	`, sessionID).Scan(&c.ID, &c.SessionID, &c.UserID, &c.CreatedAt)
+
+	if err == nil {
+		return c, nil
 	}
 
-	qm := `
-SELECT listing_id, url, is_cover, sort_order
-FROM listing_media
-WHERE listing_id = ANY($1)
-ORDER BY listing_id, sort_order;`
-	mr, err := r.db.Pool.Query(ctx, qm, ids)
+	// создаём новое
+	id := uuid.New()
+	now := time.Now().UTC()
+	err = r.db.QueryRow(ctx, `
+		INSERT INTO conversation (id, session_id, user_id, created_at)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, session_id, user_id, created_at
+	`, id, sessionID, userID, now).Scan(&c.ID, &c.SessionID, &c.UserID, &c.CreatedAt)
+	return c, err
+}
+
+func (r *conversationsRepo) GetBySession(ctx context.Context, sessionID string) (models.Conversation, error) {
+	var c models.Conversation
+	err := r.db.QueryRow(ctx, `
+		SELECT id, session_id, user_id, created_at
+		FROM conversation
+		WHERE session_id = $1
+		LIMIT 1
+	`, sessionID).Scan(&c.ID, &c.SessionID, &c.UserID, &c.CreatedAt)
+	return c, err
+}
+
+// ===== MessagesRepository impl =====
+
+type messagesRepo struct{ db *pgxpool.Pool }
+
+func (r *messagesRepo) Append(ctx context.Context, conversationID uuid.UUID, role, text string, meta map[string]string) (uuid.UUID, error) {
+	id := uuid.New()
+	now := time.Now().UTC()
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO message (id, conversation_id, role, text, meta, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, id, conversationID, role, text, meta, now)
+	return id, err
+}
+
+func (r *messagesRepo) ListLast(ctx context.Context, conversationID uuid.UUID, limit int) ([]models.Message, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, conversation_id, role, text, meta, created_at
+		FROM message
+		WHERE conversation_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, conversationID, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer mr.Close()
+	defer rows.Close()
 
-	type mediaRow struct {
-		ListingID string
-		URL       string
-		IsCover   bool
-		Sort      int
-	}
-	mediaMap := make(map[string][]models.ListingMedia)
-	for mr.Next() {
-		var id string
-		var m models.ListingMedia
-		if err := mr.Scan(&id, &m.URL, &m.IsCover, &m.SortOrder); err != nil {
+	out := make([]models.Message, 0, limit)
+	for rows.Next() {
+		var m models.Message
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.Role, &m.Text, &m.Meta, &m.CreatedAt); err != nil {
 			return nil, err
 		}
-		mediaMap[id] = append(mediaMap[id], m)
+		out = append(out, m)
 	}
-	if err := mr.Err(); err != nil {
-		return nil, err
+	// лучше вернуть в порядке по возрастанию времени (UI): разворачиваем
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
 	}
+	return out, rows.Err()
+}
 
-	for i := range results {
-		if m, ok := mediaMap[results[i].Listing.ID]; ok {
-			results[i].Media = m
-		}
+// ===== SearchRequestsRepository impl =====
+
+type searchRequestsRepo struct{ db *pgxpool.Pool }
+
+func (r *searchRequestsRepo) Insert(ctx context.Context, sr models.SearchRequest) (uuid.UUID, error) {
+	if sr.ID == uuid.Nil {
+		sr.ID = uuid.New()
 	}
-	return results, nil
+	if sr.CreatedAt.IsZero() {
+		sr.CreatedAt = time.Now().UTC()
+	}
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO search_request (id, session_id, user_id, query, params, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, sr.ID, sr.SessionID, sr.UserID, sr.Query, sr.Params, sr.CreatedAt)
+	return sr.ID, err
 }

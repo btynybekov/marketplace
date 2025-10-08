@@ -34,7 +34,7 @@ func main() {
 	defer db.Close()
 
 	// 3) Репозитории
-	repos := repository.NewSet(db)
+	repos := repository.New(db.Pool)
 
 	// 4) AI-клиент (openai | local)
 	var aiClient ai.Client
