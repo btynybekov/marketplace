@@ -1,31 +1,26 @@
-# Stage 1: Build
-FROM golang:1.21-alpine AS builder
+# Stage 1: builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
-
-# Копируем go.mod и go.sum
+RUN apk add --no-cache git bash
 COPY go.mod go.sum ./
 RUN go mod download
-
-# Копируем исходники
 COPY . .
+RUN go build -o marketplace
 
-# Собираем бинарник
-RUN go build -o marketplace ./cmd/server
-
-# Stage 2: Run
-FROM alpine:latest
-
+# Stage 2: final
+FROM alpine:3.18
 WORKDIR /app
 
-# Копируем бинарник из build stage
+# Копируем бинарь и шаблоны
 COPY --from=builder /app/marketplace .
+COPY --from=builder /app/templates ./templates
 
-# Копируем configs (опционально)
-COPY configs ./configs
+# Копируем .env внутрь контейнера
+COPY --from=builder /app/.env ./
 
-# Устанавливаем timezone (по желанию)
-RUN apk add --no-cache tzdata
+# Устанавливаем зависимости
+RUN apk add --no-cache bash ca-certificates
 
 # Запуск приложения
 CMD ["./marketplace"]
