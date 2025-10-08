@@ -41,7 +41,7 @@ func LoadFromEnv() EnvConfig {
 // GetDSN возвращает строку подключения к БД
 func GetDSN(cfg EnvConfig) string {
 	if cfg.DatabaseURL != "" {
-		return Env.DatabaseURL
+		return cfg.DatabaseURL
 	}
 	log.Fatal("DATABASE_URL is not set, cannot connect to DB")
 	return ""

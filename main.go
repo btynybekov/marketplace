@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/btynybekov/marketplace/config"
 	db "github.com/btynybekov/marketplace/database"
@@ -16,7 +14,7 @@ import (
 func main() {
 	// 1️⃣ Загружаем конфиг
 	conf := config.LoadFromEnv()
-	fmt.Println("DATABASE_URL:", os.Getenv("DATABASE_URL"))
+
 	// 2️⃣ Инициализируем базу данных
 	db.InitDB(conf)
 	defer db.CloseDB()
