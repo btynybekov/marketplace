@@ -1,36 +1,43 @@
-// internal/handlers/homepage/homepage.go
 package homepage
 
 import (
 	"html/template"
 	"net/http"
 
-	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/handlers/shared"
 	"github.com/btynybekov/marketplace/internal/repository"
 )
 
 type HomePageHandler struct {
-	Repo repository.Repository
-	Tmpl *template.Template
+	repos repository.RepositorySet
+	tmpl  *template.Template
 }
 
-func NewHomePageHandler(repo repository.Repository, tmpl *template.Template) *HomePageHandler {
-	return &HomePageHandler{
-		Repo: repo,
-		Tmpl: tmpl,
-	}
+func NewHomePageHandler(repos repository.RepositorySet, tmpl *template.Template) *HomePageHandler {
+	return &HomePageHandler{repos: repos, tmpl: tmpl}
 }
 
 func (h *HomePageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Categories  []models.Category
-		RecentItems []models.Item
-	}{}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-	data.Categories, _ = h.Repo.GetCategories(r.Context())
-	data.RecentItems, _ = h.Repo.GetRecentItems(r.Context(), 10)
+	ctx := r.Context()
+	roots, err := h.repos.Categories().ListRoots(ctx)
+	if err != nil {
+		shared.InternalError(w, err)
+		return
+	}
 
-	if err := h.Tmpl.ExecuteTemplate(w, "homepage.html", data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if h.tmpl == nil || h.tmpl.Lookup("homepage.html") == nil {
+		shared.WriteJSON(w, http.StatusOK, map[string]any{"categories": roots})
+		return
+	}
+
+	if err := h.tmpl.ExecuteTemplate(w, "homepage.html", map[string]any{
+		"Categories": roots,
+	}); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }

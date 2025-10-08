@@ -3,52 +3,80 @@ package categories
 import (
 	"html/template"
 	"net/http"
+	"strconv"
+	"strings"
 
-	"github.com/btynybekov/marketplace/internal/models"
+	"github.com/btynybekov/marketplace/internal/handlers/shared"
 	"github.com/btynybekov/marketplace/internal/repository"
-	"github.com/gorilla/mux"
 )
 
 type CategoryHandler struct {
-	Repo repository.Repository
-	Tmpl *template.Template
+	repos repository.RepositorySet
+	tmpl  *template.Template // ожидается layout с именем "categories.html"
 }
 
-func NewCategoriesHandler(repo repository.Repository, tmpl *template.Template) *CategoryHandler {
-	return &CategoryHandler{
-		Repo: repo,
-		Tmpl: tmpl,
-	}
+func NewCategoryHandler(repos repository.RepositorySet, tmpl *template.Template) *CategoryHandler {
+	return &CategoryHandler{repos: repos, tmpl: tmpl}
 }
+
+// ServeHTTP позволяет использовать как r.Handle("/categories", h)
 func (h *CategoryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	slug := mux.Vars(r)["slug"]
+	switch r.Method {
+	case http.MethodGet:
+		h.handleList(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
 
-	// Получаем категорию
-	category, err := h.Repo.GetCategoryBySlug(r.Context(), slug)
+// handleList — GET /categories[?parent_slug=transport]
+func (h *CategoryHandler) handleList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	parent := strings.TrimSpace(r.URL.Query().Get("parent_slug"))
+
+	var (
+		data any
+		err  error
+	)
+	if parent == "" {
+		data, err = h.repos.Categories().ListRoots(ctx)
+	} else {
+		data, err = h.repos.Categories().ListChildrenBySlug(ctx, parent)
+	}
 	if err != nil {
-		http.Error(w, "Category not found", http.StatusNotFound)
+		shared.InternalError(w, err)
 		return
 	}
 
-	// Получаем товары этой категории
-	items, err := h.Repo.GetItemsByCategoryID(r.Context(), category.ID)
+	// Если клиент просит JSON — отдадим JSON
+	if acceptsJSON(r) || h.tmpl == nil || h.tmpl.Lookup("categories.html") == nil {
+		shared.WriteJSON(w, http.StatusOK, data)
+		return
+	}
+
+	// Иначе отрисуем HTML
+	if err := h.tmpl.ExecuteTemplate(w, "categories.html", map[string]any{
+		"Categories": data,
+		"ParentSlug": parent,
+	}); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func acceptsJSON(r *http.Request) bool {
+	accept := r.Header.Get("Accept")
+	return strings.Contains(strings.ToLower(accept), "application/json") ||
+		strings.Contains(strings.ToLower(accept), "json")
+}
+
+// helper (иногда полезен для query-параметров int)
+func atoi(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	v, err := strconv.Atoi(s)
 	if err != nil {
-		http.Error(w, "Failed to get items", http.StatusInternalServerError)
-		return
+		return def
 	}
-
-	// Формируем структуру для шаблона
-	data := struct {
-		Category models.Category
-		Items    []models.Item
-	}{
-		Category: category,
-		Items:    items,
-	}
-
-	// Рендерим шаблон
-	if err := h.Tmpl.ExecuteTemplate(w, "category.html", data); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		return
-	}
+	return v
 }

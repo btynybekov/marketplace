@@ -2,62 +2,74 @@ package factory
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 
+	"github.com/gorilla/mux"
+
 	"github.com/btynybekov/marketplace/config"
+	"github.com/btynybekov/marketplace/internal/ai"
+	"github.com/btynybekov/marketplace/internal/repository"
+
+	// твои хендлеры
 	"github.com/btynybekov/marketplace/internal/handlers/assistant"
 	"github.com/btynybekov/marketplace/internal/handlers/categories"
 	"github.com/btynybekov/marketplace/internal/handlers/chat"
 	"github.com/btynybekov/marketplace/internal/handlers/homepage"
 	"github.com/btynybekov/marketplace/internal/handlers/items"
-	"github.com/btynybekov/marketplace/internal/middleware"
-	"github.com/btynybekov/marketplace/internal/repository"
-	"github.com/gorilla/mux"
 )
 
-// HandlersFactory хранит все хендлеры
 type HandlersFactory struct {
-	ChatHandler       *chat.ChatHandler
-	ChatAjaxHandler   *chat.ChatAjaxHandler
+	// страницы
+	HomepageHandler   *homepage.HomePageHandler
 	CategoriesHandler *categories.CategoryHandler
 	ItemsHandler      *items.ItemHandler
-	HomepageHandler   *homepage.HomePageHandler
-	BuyerAssistant    *assistant.AssistantHandler
-	SellerAssistant   *assistant.AssistantHandler
+
+	// чат
+	ChatPageHandler http.Handler      // GET /chat (рендер страницы)
+	ChatHandler     *chat.ChatHandler // API: /chat/session, /chat/ajax, /chat/history
+
+	// ассистенты (прямая прокся на n8n)
+	BuyerAssistant  *assistant.AssistantHandler
+	SellerAssistant *assistant.AssistantHandler
 }
 
-// NewHandlersFactory создаёт все хендлеры и возвращает фабрику
-func NewHandlersFactory(repo repository.Repository, tmpl *template.Template, conf config.EnvConfig) *HandlersFactory {
-	log.Println("Buyer Webhook URL:", conf.N8NBuyerWebhookURL)
-	log.Println("Seller Webhook URL:", conf.N8NSellerWebhookURL)
+// NewHandlersFactory — теперь принимает aiClient.
+func NewHandlersFactory(
+	repo repository.RepositorySet,
+	tmpl *template.Template,
+	conf config.EnvConfig,
+	aiClient ai.Client,
+) *HandlersFactory {
+
+	chatSvc := chat.NewService(repo, aiClient, nil, conf)
+
 	return &HandlersFactory{
-		ChatHandler:       chat.NewChatHandler(repo),
-		ChatAjaxHandler:   chat.NewChatAjaxHandler(repo),
-		CategoriesHandler: categories.NewCategoriesHandler(repo, tmpl),
-		ItemsHandler:      items.NewItemsHandler(repo, tmpl),
 		HomepageHandler:   homepage.NewHomePageHandler(repo, tmpl),
-		BuyerAssistant:    assistant.NewAssistantHandler(conf.N8NBuyerWebhookURL),
-		SellerAssistant:   assistant.NewAssistantHandler(conf.N8NSellerWebhookURL),
+		CategoriesHandler: categories.NewCategoryHandler(repo, tmpl),
+		ItemsHandler:      items.NewItemHandler(repo, tmpl),
+
+		ChatPageHandler: chat.NewChatHandler(repo).WithTemplate(tmpl), // страница
+		ChatHandler:     chat.NewChatHTTP(chatSvc),                    // API-обработчик с методами
+
+		BuyerAssistant:  assistant.NewAssistantHandler(conf.N8NBuyerWebhookURL),
+		SellerAssistant: assistant.NewAssistantHandler(conf.N8NSellerWebhookURL),
 	}
 }
 
-// RegisterRoutes регистрирует все маршруты через mux.Router
+// RegisterRoutes — централизованная регистрация.
 func (f *HandlersFactory) RegisterRoutes(r *mux.Router) {
+	// ассистенты (n8n)
 	r.Handle("/assistant/buyer", f.BuyerAssistant).Methods(http.MethodPost)
-	r.Handle("/assistant/seller", middleware.AuthMiddleware(f.SellerAssistant)).Methods(http.MethodPost)
+	r.Handle("/assistant/seller", f.SellerAssistant).Methods(http.MethodPost)
+
+	// страницы
 	r.Handle("/", f.HomepageHandler).Methods(http.MethodGet)
-	r.Handle("/chat", f.ChatHandler).Methods(http.MethodGet)
-	r.Handle("/chat/ajax", f.ChatAjaxHandler).Methods(http.MethodPost)
+	r.Handle("/chat", f.ChatPageHandler).Methods(http.MethodGet)
 	r.Handle("/categories", f.CategoriesHandler).Methods(http.MethodGet)
 	r.Handle("/items", f.ItemsHandler).Methods(http.MethodGet)
-}
 
-// MustParseTemplates парсит все html шаблоны и логирует fatal при ошибке
-func MustParseTemplates(pattern string) *template.Template {
-	tmpl, err := template.ParseGlob(pattern)
-	if err != nil {
-		log.Fatalf("Failed to parse templates: %v", err)
-	}
-	return tmpl
+	// чат API (методами ChatHandler)
+	r.Handle("/chat/session", f.ChatHandler.StartSession()).Methods(http.MethodPost)
+	r.Handle("/chat/ajax", f.ChatHandler.SendMessage()).Methods(http.MethodPost)
+	r.Handle("/chat/history", f.ChatHandler.GetHistory()).Methods(http.MethodGet)
 }

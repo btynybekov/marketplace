@@ -1,44 +1,72 @@
+// internal/domain/types.go
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
-type Item struct {
-	ID            int32
-	CategoryId    int32
-	SubCategoryId int32
-	Stock         *int32
-	Price         float64
-	Weight        *float64
-	Name          string
-	Description   string
-	ImageURL      *string
-	Color         *string
-	CreatedAt     time.Time
-}
+type UUID = string // или pgtype.UUID если используешь pgx-types
 
 type Category struct {
-	ID        int32
-	Name      string
-	ImageURL  string
-	Slug      string
-	CreatedAt time.Time
-}
-
-type ChatMessage struct {
-	ID        int64     `json:"id"`
-	UserID    string    `json:"user_id"`
-	Role      string    `json:"role"`
-	Content   string    `json:"content"`
+	ID        UUID      `json:"id"`
+	ParentID  *UUID     `json:"parent_id,omitempty"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	Path      string    `json:"path"`
+	IsActive  bool      `json:"is_active"`
+	SortOrder int       `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-type ChatRequest struct {
-	UserID  string `json:"user_id"`
-	Message string `json:"message"`
+type ProductMedia struct {
+	ID        UUID    `json:"id"`
+	ProductID UUID    `json:"product_id"`
+	URL       string  `json:"url"`
+	Type      string  `json:"type"` // "image" | "video" ...
+	IsCover   bool    `json:"is_cover"`
+	Alt       *string `json:"alt,omitempty"`
+	SortOrder int     `json:"sort_order"`
 }
 
-type ChatResponse struct {
-	UserID    string `json:"user_id"`
-	Message   string `json:"message"`
-	Timestamp string `json:"timestamp"`
+type Product struct {
+	ID         UUID            `json:"id"`
+	CategoryID UUID            `json:"category_id"`
+	BrandID    *UUID           `json:"brand_id,omitempty"`
+	Model      string          `json:"model"`
+	Title      string          `json:"title"`
+	Specs      json.RawMessage `json:"specs"` // JSONB
+	IsActive   bool            `json:"is_active"`
+	Media      []ProductMedia  `json:"media,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
+type ListingMedia struct {
+	ID        UUID    `json:"id"`
+	ListingID UUID    `json:"listing_id"`
+	URL       string  `json:"url"`
+	Type      string  `json:"type"`
+	IsCover   bool    `json:"is_cover"`
+	Alt       *string `json:"alt,omitempty"`
+	SortOrder int     `json:"sort_order"`
+}
+
+type Listing struct {
+	ID           UUID            `json:"id"`
+	SellerID     UUID            `json:"seller_id"`
+	ProductID    UUID            `json:"product_id"`
+	CategoryID   UUID            `json:"category_id"`
+	Title        string          `json:"title"`
+	Description  string          `json:"description"`
+	PriceAmount  float64         `json:"price_amount"`
+	CurrencyCode string          `json:"currency_code"` // "KGS"/"USD"
+	Condition    string          `json:"condition"`     // "new"/"used"
+	LocationText string          `json:"location_text"`
+	Attrs        json.RawMessage `json:"attrs"`  // JSONB
+	Status       string          `json:"status"` // "active"/"archived"
+	Media        []ListingMedia  `json:"media,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
 }

@@ -2,35 +2,45 @@ package chat
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 
+	"github.com/btynybekov/marketplace/internal/handlers/shared"
 	"github.com/btynybekov/marketplace/internal/repository"
 )
 
-type ChatHandler struct {
-	Repo repository.Repository
-	Tmpl *template.Template
+// ChatPageHandler — хендлер страницы чата (GET /chat).
+type ChatPageHandler struct {
+	repos repository.RepositorySet
+	tmpl  *template.Template // ожидается шаблон "chat.html" (если используешь HTML)
 }
 
-func NewChatHandler(repo repository.Repository) *ChatHandler {
-	tmpl, err := template.ParseFiles("templates/chat.html") // только этот шаблон
-	if err != nil {
-		log.Fatalf("ошибка при парсинге chat.html: %v", err)
-	}
-
-	return &ChatHandler{
-		Repo: repo,
-		Tmpl: tmpl,
-	}
+// NewChatHandler — конструктор страницы чата.
+func NewChatHandler(repos repository.RepositorySet) *ChatPageHandler {
+	return &ChatPageHandler{repos: repos}
 }
 
-func (h *ChatHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"title": "Чат с ассистентом",
+// WithTemplate — опционально подвязать html/template.
+func (h *ChatPageHandler) WithTemplate(t *template.Template) *ChatPageHandler {
+	h.tmpl = t
+	return h
+}
+
+// ServeHTTP — рендер страницы чата (или JSON-заглушки).
+func (h *ChatPageHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
-	err := h.Tmpl.Execute(w, data)
-	if err != nil {
-		http.Error(w, "failed to render template", http.StatusInternalServerError)
+
+	// если нет шаблона — отдадим JSON
+	if h.tmpl == nil || h.tmpl.Lookup("chat.html") == nil {
+		shared.WriteJSON(w, http.StatusOK, map[string]any{
+			"message": "chat page",
+		})
+		return
+	}
+
+	if err := h.tmpl.ExecuteTemplate(w, "chat.html", nil); err != nil {
+		http.Error(w, "template render error: "+err.Error(), http.StatusInternalServerError)
 	}
 }
