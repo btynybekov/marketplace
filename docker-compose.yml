@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   marketplace_postgres:
     image: postgres:15
@@ -14,10 +16,20 @@ services:
     networks:
       - shared-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Одноразовый контейнер для запуска миграций: `docker compose run --rm migrate up`
+  migrate:
+    image: migrate/migrate:latest
+    container_name: marketplace_migrate
+    networks:
+      - shared-network
+    # примонтируем папку миграций только для чтения (ro = read-only)
+    volumes:
+      - ./migrations:/migrations:ro
 
   marketplace_app:
     build:
@@ -37,7 +49,8 @@ services:
     networks:
       - shared-network
     volumes:
-      - ./.env:/app/.env
+      - ./.env:/app/.env:ro
+      - ./migrations:/app/migrations:ro
 
 volumes:
   pgdata:

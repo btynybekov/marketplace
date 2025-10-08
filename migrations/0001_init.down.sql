@@ -1,0 +1,2 @@
+-- безопасный откат (не используем в проде, но CLI его требует)
+-- DROP SCHEMA public CASCADE; CREATE SCHEMA public; CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
